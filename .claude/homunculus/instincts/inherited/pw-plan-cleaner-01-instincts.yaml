@@ -1,0 +1,410 @@
+# Instincts generated from https://github.com/shochaochin-byte/pw-plan-cleaner-01
+# Generated: 2026-05-19T18:10:16.097Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: pw-plan-cleaner-01-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: feat, fix
+
+## Evidence
+
+- 3 commits analyzed
+- Detected conventional commit pattern
+- Examples: feat: restyle UI to match PW-PLAN-CLEANER-01 reference design, fix: stop overly broad slider CSS from swallowing label text
+
+---
+id: pw-plan-cleaner-01-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Commit Length
+
+## Action
+
+Write moderate-length commit messages (~60 characters)
+
+## Evidence
+
+- Average commit message length: 60 chars
+- Based on 3 commits
+
+---
+id: pw-plan-cleaner-01-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Naming Files
+
+## Action
+
+Use snake_case naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: snake_case
+
+---
+id: pw-plan-cleaner-01-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: pw-plan-cleaner-01-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: pw-plan-cleaner-01-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: pw-plan-cleaner-01-workflow-feature-addition-with-ui-and-tests
+trigger: "when doing feature addition with ui and tests"
+confidence: 0.55
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Workflow Feature Addition With Ui And Tests
+
+## Action
+
+Follow the feature-addition-with-ui-and-tests workflow:
+1. Create new processing logic in a dedicated module under cleaner/
+2. Update app.py to add UI controls and integrate the new feature into the interface
+3. Add or update tests in tests/test_pipeline_stages.py to cover the new feature
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~1x per month
+- Files: cleaner/*.py, app.py, tests/test_pipeline_stages.py
+
+---
+id: pw-plan-cleaner-01-workflow-ui-restyle-or-fix
+trigger: "when doing ui restyle or fix"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Workflow Ui Restyle Or Fix
+
+## Action
+
+Follow the ui-restyle-or-fix workflow:
+1. Edit app.py to adjust styles, layout, or component behavior
+2. Test visually to confirm changes
+3. Commit with a descriptive message
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: app.py
+
+---
+id: pw-plan-cleaner-01-instinct-file-naming
+trigger: "When creating or renaming a Python file"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Instinct File Naming
+
+## Action
+
+Use snake_case for file names
+
+## Evidence
+
+- Pattern in files: cleaner/*.py
+- Naming convention: files = snake_case
+
+---
+id: pw-plan-cleaner-01-instinct-function-naming
+trigger: "When defining a new function"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Instinct Function Naming
+
+## Action
+
+Use camelCase for function names
+
+## Evidence
+
+- Naming convention: functions = camelCase
+
+---
+id: pw-plan-cleaner-01-instinct-class-naming
+trigger: "When creating a new class"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Instinct Class Naming
+
+## Action
+
+Use PascalCase for class names
+
+## Evidence
+
+- Naming convention: classes = PascalCase
+
+---
+id: pw-plan-cleaner-01-instinct-constant-naming
+trigger: "When defining a constant"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Instinct Constant Naming
+
+## Action
+
+Use SCREAMING_SNAKE_CASE for constant names
+
+## Evidence
+
+- Naming convention: constants = SCREAMING_SNAKE_CASE
+
+---
+id: pw-plan-cleaner-01-instinct-import-style
+trigger: "When importing modules within the package"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Instinct Import Style
+
+## Action
+
+Use relative imports
+
+## Evidence
+
+- importStyle: relative
+
+---
+id: pw-plan-cleaner-01-instinct-export-style
+trigger: "When exporting functions or classes from a module"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Instinct Export Style
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- exportStyle: named
+
+---
+id: pw-plan-cleaner-01-instinct-test-location
+trigger: "When adding or updating tests"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Instinct Test Location
+
+## Action
+
+Place tests in the separate tests/ folder, mirroring the module structure
+
+## Evidence
+
+- Pattern in files: tests/test_pipeline_stages.py
+- Architecture: testLocation = separate
+
+---
+id: pw-plan-cleaner-01-instinct-test-coverage-feature
+trigger: "When adding a new feature or processing logic"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Instinct Test Coverage Feature
+
+## Action
+
+Add or update tests in tests/test_pipeline_stages.py to cover the new feature
+
+## Evidence
+
+- Workflow: feature-addition-with-ui-and-tests
+- Commit sequence: Add or update tests in tests/test_pipeline_stages.py
+
+---
+id: pw-plan-cleaner-01-instinct-git-commit-format
+trigger: "When writing a commit message"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Instinct Git Commit Format
+
+## Action
+
+Use conventional commit prefixes (feat, fix) followed by a concise description
+
+## Evidence
+
+- Commits: feat: restyle UI...
+- fix: stop overly broad slider CSS...
+- type: conventional
+
+---
+id: pw-plan-cleaner-01-instinct-git-commit-length
+trigger: "When composing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Instinct Git Commit Length
+
+## Action
+
+Keep commit messages around 60 characters on average
+
+## Evidence
+
+- Commits: averageLength = 60
+
+---
+id: pw-plan-cleaner-01-instinct-workflow-feature-addition
+trigger: "When someone wants to add a new processing mode or feature to the application"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Instinct Workflow Feature Addition
+
+## Action
+
+Create new processing logic in cleaner/, update app.py for UI, and add/update tests in tests/test_pipeline_stages.py
+
+## Evidence
+
+- Workflow: feature-addition-with-ui-and-tests
+- Commit sequence and files involved
+
+---
+id: pw-plan-cleaner-01-instinct-workflow-ui-restyle-fix
+trigger: "When someone wants to update the look and feel or fix UI bugs"
+confidence: 0.85
+domain: workflow
+source: repo-analysis
+source_repo: shochaochin-byte/pw-plan-cleaner-01
+---
+
+# Pw Plan Cleaner 01 Instinct Workflow Ui Restyle Fix
+
+## Action
+
+Edit app.py to adjust styles, layout, or component behavior, test visually, and commit with a descriptive message
+
+## Evidence
+
+- Workflow: ui-restyle-or-fix
+- Commit sequence and files involved
+
