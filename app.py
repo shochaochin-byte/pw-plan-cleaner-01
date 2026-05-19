@@ -134,20 +134,39 @@ section[data-testid="stSidebar"] { display:none; }
 }
 .slider-val { font-weight:600; color:var(--ink); }
 
-/* Force red sliders */
-[data-testid="stSlider"] > div > div > div { background:transparent !important; }
+/* ── Slider: target only thumb and track, never text containers ── */
 [data-testid="stSlider"] [role="slider"] {
-  background:var(--pupa-red) !important; border:none !important;
+  background:var(--pupa-red) !important; border:2px solid var(--pupa-red) !important;
   width:14px !important; height:14px !important; border-radius:50% !important;
   box-shadow:none !important;
 }
-[data-testid="stSlider"] .stSlider [data-baseweb="slider"] div[role="slider"] { background:var(--pupa-red) !important; }
-div[data-testid="stSlider"] div[style*="background"] { background:var(--pupa-red) !important; }
-[data-testid="stSlider"] [data-baseweb="slider"] > div:nth-child(3) > div { background:var(--pupa-red) !important; }
-[data-testid="stSlider"] [data-baseweb="slider"] > div:nth-child(2) { background:rgba(232,56,42,.25) !important; }
+/* filled track portion */
+[data-testid="stSlider"] [data-baseweb="slider"] [data-testid="stSliderTrack"] > div:first-child {
+  background:rgba(232,56,42,.22) !important;
+}
+[data-testid="stSlider"] [data-baseweb="slider"] [data-testid="stSliderTrack"] > div:nth-child(2) {
+  background:var(--pupa-red) !important;
+}
 
-/* ── Detection preview toggle ── */
-[data-testid="stToggle"] label { font-family:'IBM Plex Mono',monospace; font-size:.7rem; letter-spacing:.08em; }
+/* ── Ensure all widget labels stay readable ── */
+[data-testid="stSlider"] label,
+[data-testid="stSlider"] p,
+[data-testid="stToggle"] label,
+[data-testid="stToggle"] p,
+[data-testid="stRadio"] label,
+[data-testid="stRadio"] p,
+[data-testid="stColorPicker"] label,
+[data-testid="stColorPicker"] p,
+[data-testid="stFileUploader"] label,
+[data-testid="stFileUploader"] p,
+.stMarkdown p, .stMarkdown span,
+[data-testid="stText"] {
+  color: var(--ink) !important;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ── Toggle ── */
+[data-testid="stToggle"] label { font-size:.7rem; letter-spacing:.08em; }
 [data-testid="stToggle"] [role="switch"][aria-checked="true"] { background:var(--pupa-red) !important; }
 
 /* ── Export buttons ── */
