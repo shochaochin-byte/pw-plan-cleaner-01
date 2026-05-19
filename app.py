@@ -9,6 +9,7 @@ import streamlit as st
 
 from cleaner.export import save_outputs
 from cleaner.geometry_parser import parse_pdf_geometry
+from cleaner.halftone_duotone import duotone_flat, halftone_duotone
 from cleaner.masking import colorize_overlay, mask_to_transparent_png
 from cleaner.preview import render_pdf_page
 from cleaner.raster_cleaner import clean_raster_image
@@ -305,6 +306,14 @@ with right:
 <div class='legend-item'><span class='layer-swatch swatch-seg'></span> SEGMENTATION ZONES</div>
 """, unsafe_allow_html=True)
 
+    st.markdown("<div class='sec-label' style='margin-top:.9rem'>HALFTONE DUOTONE PRINT</div>", unsafe_allow_html=True)
+    enable_halftone = st.toggle("ENABLE HALFTONE", value=False)
+    halftone_mode = st.radio("Render", ["Halftone (AM dots)", "Flat bitmap"], horizontal=False, label_visibility="collapsed")
+    ink_dark  = st.color_picker("INK DARK",  "#1B1F5E", label_visibility="visible")
+    ink_light = st.color_picker("INK LIGHT", "#E8382A", label_visibility="visible")
+    ht_cell   = st.slider("CELL SIZE (px)", 6, 24, 10, 1, label_visibility="collapsed")
+    st.markdown("<div class='slider-label'><span>CELL SIZE</span><span class='slider-val'>{} px</span></div>".format(ht_cell), unsafe_allow_html=True)
+
 if uploaded:
     pdf_bytes = uploaded.read()
     before = render_pdf_page(pdf_bytes, 0, 2.0)
@@ -316,7 +325,19 @@ if uploaded:
 
     with center:
         st.markdown("<div class='sec-label'>PLAN WORKSPACE</div>", unsafe_allow_html=True)
-        st.image(cv2.cvtColor(before, cv2.COLOR_BGR2RGB), use_container_width=True)
+        if enable_halftone:
+            with st.spinner("Rendering halftone duotone…"):
+                hatch_for_ht = None
+                if "state" in st.session_state and st.session_state.state:
+                    # reuse previous run's red mask stored via overlay diff
+                    pass
+                if halftone_mode.startswith("Flat"):
+                    ht_preview = duotone_flat(before, color_dark=ink_dark, color_light=ink_light)
+                else:
+                    ht_preview = halftone_duotone(before, cell=ht_cell, color_dark=ink_dark, color_light=ink_light)
+            st.image(cv2.cvtColor(ht_preview, cv2.COLOR_BGR2RGB), use_container_width=True)
+        else:
+            st.image(cv2.cvtColor(before, cv2.COLOR_BGR2RGB), use_container_width=True)
         if st.button("▶  RUN PREPROCESSING"):
             if do_vector:
                 cleaned_pdf, debug_data, decisions_by_page = clean_vector_pdf_bytes(pdf_bytes, sensitivity)
@@ -364,10 +385,16 @@ if uploaded:
                 landscape_mask=masks.landscape_mask,
             )
 
+            if halftone_mode.startswith("Flat"):
+                ht_result = duotone_flat(before, hatch_mask=red, color_dark=ink_dark, color_light=ink_light)
+            else:
+                ht_result = halftone_duotone(before, hatch_mask=red, cell=ht_cell, color_dark=ink_dark, color_light=ink_light)
+
             st.session_state.state = {
                 "before": before,
                 "cleaned": cleaned,
                 "overlay": overlay,
+                "halftone": ht_result,
                 "outputs": outputs,
                 "debug": debug_data,
                 "mode": "vector" if do_vector else "raster",
@@ -398,8 +425,19 @@ if st.session_state.state:
 """, unsafe_allow_html=True)
 
     with b3:
-        st.markdown("<div class='sec-label'>AI LANDSCAPE MASK PREVIEW</div>", unsafe_allow_html=True)
-        if show_debug:
+        st.markdown("<div class='sec-label'>HALFTONE DUOTONE PRINT</div>", unsafe_allow_html=True)
+        if "halftone" in data:
+            ht_rgb = cv2.cvtColor(data["halftone"], cv2.COLOR_BGR2RGB)
+            st.image(ht_rgb, use_container_width=True)
+            ok, ht_buf = cv2.imencode(".png", data["halftone"])
+            if ok:
+                st.download_button(
+                    "EXPORT HALFTONE PNG  ↗ PNG",
+                    data=ht_buf.tobytes(),
+                    file_name="halftone_duotone.png",
+                    mime="image/png",
+                )
+        elif show_debug:
             st.image(cv2.cvtColor(data["overlay"], cv2.COLOR_BGR2RGB), use_container_width=True)
 
     with b4:
