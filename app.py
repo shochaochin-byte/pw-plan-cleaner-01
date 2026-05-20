@@ -372,6 +372,36 @@ with right:
 <div class='legend-item'><span class='layer-swatch swatch-seg'></span> SEGMENTATION ZONES</div>
 """, unsafe_allow_html=True)
 
+    # ── API KEY ──────────────────────────────────────────────────────────────
+    st.markdown("<div class='sec-label' style='margin-top:.9rem'>ANTHROPIC API KEY</div>", unsafe_allow_html=True)
+    _raw_key = st.text_input(
+        "API key (plain or hex-encoded)", value="",
+        type="password", label_visibility="collapsed",
+        placeholder="sk-ant-… or hex-encoded key",
+    )
+
+    def _resolve_key(raw: str) -> str | None:
+        raw = raw.strip()
+        if not raw:
+            import os
+            return os.environ.get("ANTHROPIC_API_KEY")
+        # Hex-encoded? All hex chars and even length → decode
+        if len(raw) % 2 == 0 and all(c in "0123456789abcdefABCDEF" for c in raw):
+            try:
+                decoded = bytes.fromhex(raw).decode("utf-8")
+                if decoded.startswith("sk-"):
+                    return decoded
+            except Exception:
+                pass
+        return raw  # plain key
+
+    _api_key = _resolve_key(_raw_key)
+    _key_ok = bool(_api_key and _api_key.startswith("sk-"))
+    if _raw_key and not _key_ok:
+        st.markdown("<div class='small-label' style='color:var(--pupa-red)'>⚠ key not recognised</div>", unsafe_allow_html=True)
+    elif _key_ok:
+        st.markdown("<div class='small-label' style='color:#2a7a2a'>✓ key ready</div>", unsafe_allow_html=True)
+
     # ── AI LANDSCAPE PROPOSAL ────────────────────────────────────────────────
     st.markdown("<div class='sec-label' style='margin-top:.9rem'>AI LANDSCAPE PROPOSAL</div>", unsafe_allow_html=True)
     ai_backend_name = st.selectbox(
@@ -424,7 +454,11 @@ if uploaded:
     # ── Handle AI proposal (run outside column context) ─────────────────────
     if run_ai and st.session_state.state.get("pkg"):
         pkg = st.session_state.state["pkg"]
-        backend = BACKENDS[ai_backend_name]
+        from cleaner.ai_proposal import ClaudeVisionBackend, ProceduralBackend
+        if ai_backend_name == "Claude Vision":
+            backend = ClaudeVisionBackend(api_key=_api_key)
+        else:
+            backend = BACKENDS[ai_backend_name]
         with st.spinner(f"Generating landscape via {backend.name}…"):
             result = backend.propose(before, pkg, ai_prompt, ai_style, ai_tier)
         st.session_state.proposal = result
