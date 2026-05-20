@@ -586,13 +586,52 @@ if uploaded:
                 red = np.zeros(before.shape[:2], dtype=np.uint8)
                 blue = np.zeros(before.shape[:2], dtype=np.uint8)
                 red_boxes = []
+                h, w = before.shape[:2]
+                bbox_stats = {
+                    "skipped_invalid_bboxes": 0,
+                    "processed_bboxes": 0,
+                    "accepted_bboxes": 0,
+                }
+
+                def _scaled_clamped_bbox(bbox, scale=1.5):
+                    bbox_stats["processed_bboxes"] += 1
+                    x0, y0, x1, y1 = (int(v * scale) for v in bbox)
+                    x0 = max(0, min(x0, w))
+                    x1 = max(0, min(x1, w))
+                    y0 = max(0, min(y0, h))
+                    y1 = max(0, min(y1, h))
+                    if x1 <= x0 or y1 <= y0:
+                        bbox_stats["skipped_invalid_bboxes"] += 1
+                        return None
+                    bbox_stats["accepted_bboxes"] += 1
+                    return x0, y0, x1, y1
+
                 for d in decision_page:
-                    x0, y0, x1, y1 = [int(v * 1.5) for v in d["bbox"]]
+                    box = _scaled_clamped_bbox(d["bbox"])
+                    if box is None:
+                        continue
+                    x0, y0, x1, y1 = box
                     if d["remove"]:
                         red[y0:y1, x0:x1] = 255
                         red_boxes.append((x0, y0, x1, y1))
                     else:
                         blue[y0:y1, x0:x1] = 255
+
+                if isinstance(debug_data, list):
+                    if debug_data:
+                        cleaner_debug = debug_data[0]
+                    else:
+                        cleaner_debug = {"page": 0, "mode": "vector"}
+                        debug_data.append(cleaner_debug)
+                elif isinstance(debug_data, dict):
+                    cleaner_debug = debug_data
+                else:
+                    cleaner_debug = {"page": 0, "mode": "vector"}
+                    debug_data = [cleaner_debug]
+
+                cleaner_debug["processed_bboxes"] = bbox_stats["processed_bboxes"]
+                cleaner_debug["accepted_bboxes"] = bbox_stats["accepted_bboxes"]
+                cleaner_debug["skipped_invalid_bboxes"] = bbox_stats["skipped_invalid_bboxes"]
             else:
                 prog.progress(15, text="Running raster cleaner…")
                 cleaned, overlay_rb = clean_raster_image(before, sensitivity)
