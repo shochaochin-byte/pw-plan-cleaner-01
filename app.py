@@ -8,6 +8,7 @@ import numpy as np
 import streamlit as st
 
 from cleaner.ai_proposal import BACKENDS, ProposalResult
+from cleaner.capabilities import validate_startup
 from cleaner.export import save_outputs, save_landscape_bundle
 from cleaner.geometry_parser import parse_pdf_geometry
 from cleaner.halftone_duotone import duotone_flat, halftone_duotone
@@ -69,6 +70,10 @@ def _cached_tiers(land_bytes: bytes, arch_bytes: bytes, shape: tuple):
     arch = np.frombuffer(arch_bytes, np.uint8).reshape(shape)
     return assign_tiers(land, arch)
 
+
+@st.cache_data(show_spinner=False)
+def _startup_capabilities():
+    return validate_startup(Path.cwd())
 
 def _img_to_bytes(img: np.ndarray) -> bytes:
     """Fast ndarray → bytes key for cache."""
@@ -344,11 +349,18 @@ if "zone_mask" not in st.session_state:
 if "proposal" not in st.session_state:
     st.session_state.proposal = None    # ProposalResult | None
 
+cap_report = _startup_capabilities()
+
 left, center, right = st.columns([1.15, 3.6, 1.25])
 
 with left:
     st.markdown("<div class='sec-label'>↑ UPLOAD</div>", unsafe_allow_html=True)
     uploaded = st.file_uploader("DROP PDF HERE or click to upload", type=["pdf"], label_visibility="collapsed")
+
+    st.markdown("<div class='sec-label'>CAPABILITIES</div>", unsafe_allow_html=True)
+    status_icon = {"pass": "✅", "warn": "⚠️", "fail": "❌"}
+    for chk in cap_report.diagnostics:
+        st.markdown(f"<div class='small-label'>{status_icon.get(chk.status, "•")} {chk.name}</div>", unsafe_allow_html=True)
 
     # ── OCG PDF layers (functional) ──────────────────────────────────────────
     st.markdown("<div class='sec-label'>LAYERS / OVERLAYS</div>", unsafe_allow_html=True)
@@ -393,7 +405,7 @@ with left:
     st.markdown("<div class='sec-label' style='margin-top:.6rem'>ZONE INPUT MODE</div>", unsafe_allow_html=True)
     zone_mode = st.radio(
         "Zone mode",
-        ["Auto-detect", "Lasso / Polygon", "Flood fill"],
+        (["Auto-detect", "Lasso / Polygon", "Flood fill"] if cap_report.features["sam_assisted_zoning"] else ["Lasso / Polygon", "Flood fill"]),
         horizontal=False, label_visibility="collapsed",
     )
     if st.button("CLEAR ZONES"):
@@ -462,7 +474,8 @@ with right:
     # ── AI LANDSCAPE PROPOSAL ────────────────────────────────────────────────
     st.markdown("<div class='sec-label' style='margin-top:.9rem'>AI LANDSCAPE PROPOSAL</div>", unsafe_allow_html=True)
     ai_backend_name = st.selectbox(
-        "Backend", list(BACKENDS.keys()), label_visibility="collapsed"
+        "Backend", list(BACKENDS.keys()), label_visibility="collapsed",
+        disabled=not cap_report.features["agentic_layer_disambiguation"]
     )
     ai_style = st.selectbox(
         "Style", ["Naturalistic", "Tropical", "Formal", "Minimalist"], label_visibility="collapsed"
@@ -476,11 +489,15 @@ with right:
         height=70, label_visibility="collapsed",
         placeholder="Describe the landscape intent…"
     )
-    run_ai = st.button("▶  GENERATE LANDSCAPE")
+    run_ai = st.button("▶  GENERATE LANDSCAPE", disabled=not cap_report.features["agentic_layer_disambiguation"])
+    if not cap_report.features["agentic_layer_disambiguation"]:
+        st.caption("Deterministic fallback active: local AI services unavailable.")
 
     # ── HALFTONE DUOTONE PRINT ───────────────────────────────────────────────
     st.markdown("<div class='sec-label' style='margin-top:.9rem'>HALFTONE DUOTONE PRINT</div>", unsafe_allow_html=True)
-    enable_halftone = st.toggle("ENABLE HALFTONE", value=False)
+    enable_halftone = st.toggle("ENABLE HALFTONE", value=False, disabled=not cap_report.features["ai_render_modes"])
+    if not cap_report.features["ai_render_modes"]:
+        st.caption("AI render modes disabled; using deterministic base rendering.")
     halftone_mode = st.radio("Render", ["Halftone (AM dots)", "Flat bitmap"], horizontal=False, label_visibility="collapsed")
     ink_dark  = st.color_picker("INK DARK",  "#1B1F5E", label_visibility="visible")
     ink_light = st.color_picker("INK LIGHT", "#E8382A", label_visibility="visible")
@@ -509,7 +526,7 @@ if uploaded:
     do_vector = (mode == "Vector") or (mode == "Auto" and first_drawings > 20)
 
     # ── Handle AI proposal (run outside column context) ─────────────────────
-    if run_ai and st.session_state.state.get("pkg"):
+    if run_ai and cap_report.features["agentic_layer_disambiguation"] and st.session_state.state.get("pkg"):
         pkg = st.session_state.state["pkg"]
         from cleaner.ai_proposal import ClaudeVisionBackend, ProceduralBackend
         if ai_backend_name == "Claude Vision":
