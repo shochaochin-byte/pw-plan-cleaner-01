@@ -36,6 +36,63 @@ def _cached_drawings_count(pdf_bytes: bytes) -> int:
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     return len(doc[0].get_drawings())
 
+
+@st.cache_data(show_spinner=False, max_entries=8)
+def _cached_mask_package(img_bytes: bytes, hatch_bytes: bytes):
+    """Cache mask building — keyed by image + hatch content."""
+    from cleaner.mask_package import build_mask_package
+    img = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), cv2.IMREAD_COLOR)
+    hatch = np.frombuffer(hatch_bytes, np.uint8).reshape(img.shape[:2]) if hatch_bytes else None
+    return build_mask_package(img, hatch)
+
+
+@st.cache_data(show_spinner=False, max_entries=8)
+def _cached_composite(img_bytes: bytes, pkg_key: str, visible_key: str):
+    """Cache the slow composite_masks_preview — keyed by image + mask states."""
+    # pkg_key and visible_key are str hashes; actual data comes from session state
+    # This cache is invalidated when masks or visibility change
+    return st.session_state.get("_cached_composite_result")
+
+
+@st.cache_data(show_spinner=False, max_entries=4)
+def _cached_zone_detect(img_bytes: bytes, arch_bytes: bytes):
+    from cleaner.zone_detector import auto_detect_zones
+    img = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), cv2.IMREAD_COLOR)
+    arch = np.frombuffer(arch_bytes, np.uint8).reshape(img.shape[:2])
+    return auto_detect_zones(img, arch)
+
+
+@st.cache_data(show_spinner=False, max_entries=4)
+def _cached_tiers(land_bytes: bytes, arch_bytes: bytes, shape: tuple):
+    from cleaner.zone_detector import assign_tiers
+    land = np.frombuffer(land_bytes, np.uint8).reshape(shape)
+    arch = np.frombuffer(arch_bytes, np.uint8).reshape(shape)
+    return assign_tiers(land, arch)
+
+
+def _img_to_bytes(img: np.ndarray) -> bytes:
+    """Fast ndarray → bytes key for cache."""
+    return img.tobytes()
+
+
+def _composite_cached(base: np.ndarray, pkg, visible: dict) -> np.ndarray:
+    """Compute composite only when inputs change; store result in session state."""
+    import hashlib
+    vis_key = str(sorted(visible.items()))
+    # hash of architecture_locked is a cheap proxy for "masks changed"
+    mask_hash = hashlib.md5(pkg.architecture_locked.tobytes()).hexdigest()[:8]
+    img_hash  = hashlib.md5(base.tobytes()).hexdigest()[:8]
+    cache_key = f"{img_hash}_{mask_hash}_{vis_key}"
+
+    if st.session_state.get("_composite_key") == cache_key:
+        return st.session_state["_composite_result"]
+
+    from cleaner.mask_package import composite_masks_preview
+    result = composite_masks_preview(base, pkg, visible=visible)
+    st.session_state["_composite_key"] = cache_key
+    st.session_state["_composite_result"] = result
+    return result
+
 st.set_page_config(page_title="PW-PLAN-CLEANER-01", layout="wide")
 
 st.markdown(
@@ -472,7 +529,7 @@ if uploaded:
         display_img = before.copy()
         if st.session_state.state.get("pkg"):
             pkg = st.session_state.state["pkg"]
-            display_img = composite_masks_preview(display_img, pkg, visible=st.session_state.mask_vis)
+            display_img = _composite_cached(display_img, pkg, st.session_state.mask_vis)
         if st.session_state.proposal:
             prop = st.session_state.proposal
             if prop.overlay_png is not None and prop.overlay_png.shape[2] == 4:
@@ -579,7 +636,7 @@ if uploaded:
             pkg.tier_midground  = mg
             pkg.tier_background = bg
 
-            overlay = composite_masks_preview(before, pkg, visible=st.session_state.mask_vis)
+            overlay = _composite_cached(before, pkg, st.session_state.mask_vis)
             transparent = mask_to_transparent_png(cleaned, cv2.bitwise_not(red))
 
             prog.progress(80, text="Exporting outputs…")
