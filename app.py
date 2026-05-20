@@ -688,7 +688,7 @@ if uploaded:
             }
             st.session_state.proposal = None
 
-if st.session_state.state:
+if st.session_state.state.get("before") is not None:
     data = st.session_state.state
 
     st.markdown("<hr style='border:none;border-top:1px solid var(--border);margin:.75rem 0'>", unsafe_allow_html=True)
