@@ -271,3 +271,36 @@ class TestSegmentation:
             unique_vals = np.unique(mask)
             assert set(unique_vals).issubset({0, 255}), \
                 f"{name} must be binary (0 or 255), got values: {unique_vals}"
+
+
+# ── Vector debug bbox clamping/validation ─────────────────────────────────────
+
+class TestVectorDebugMasks:
+    def setup_method(self):
+        from cleaner.vector_debug import build_vector_debug_masks
+        self.build_vector_debug_masks = build_vector_debug_masks
+
+    def test_clamps_out_of_bounds_and_negative_bboxes(self):
+        decisions = [
+            {"bbox": [-10, -5, 20, 10], "remove": True},
+            {"bbox": [90, 90, 120, 140], "remove": False},
+        ]
+        red, blue, red_boxes, skipped = self.build_vector_debug_masks(decisions, (100, 100, 3), scale=1.0)
+
+        assert skipped == 0
+        assert red_boxes == [(0, 0, 20, 10)]
+        assert np.all(red[0:10, 0:20] == 255)
+        assert np.all(blue[90:100, 90:100] == 255)
+
+    def test_rejects_degenerate_bboxes_and_increments_metric(self):
+        decisions = [
+            {"bbox": [10, 10, 10, 30], "remove": True},
+            {"bbox": [5, 8, 12, 8], "remove": False},
+            {"bbox": [20, 20, 25, 25], "remove": True},
+        ]
+        red, blue, red_boxes, skipped = self.build_vector_debug_masks(decisions, (100, 100), scale=1.0)
+
+        assert skipped == 2
+        assert red_boxes == [(20, 20, 25, 25)]
+        assert int(np.count_nonzero(red)) == 25
+        assert int(np.count_nonzero(blue)) == 0

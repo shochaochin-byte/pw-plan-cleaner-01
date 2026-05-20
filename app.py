@@ -19,6 +19,7 @@ from cleaner.raster_cleaner import clean_raster_image
 from cleaner.svg_export import export_debug_svg
 from cleaner.vector_cleaner import clean_vector_pdf_bytes
 from cleaner.zone_detector import auto_detect_zones, assign_tiers, canvas_json_to_mask, flood_fill_zone, merge_zone_masks
+from cleaner.vector_debug import build_vector_debug_masks
 
 
 @st.cache_data(show_spinner=False)
@@ -92,6 +93,9 @@ def _composite_cached(base: np.ndarray, pkg, visible: dict) -> np.ndarray:
     st.session_state["_composite_key"] = cache_key
     st.session_state["_composite_result"] = result
     return result
+
+
+
 
 st.set_page_config(page_title="PW-PLAN-CLEANER-01", layout="wide")
 
@@ -583,16 +587,13 @@ if uploaded:
                 prog.progress(50, text="Rasterising cleaned PDF…")
                 cleaned = render_pdf_page(cleaned_pdf, 0, 1.5)
                 decision_page = decisions_by_page[0] if decisions_by_page else []
-                red = np.zeros(before.shape[:2], dtype=np.uint8)
-                blue = np.zeros(before.shape[:2], dtype=np.uint8)
-                red_boxes = []
-                for d in decision_page:
-                    x0, y0, x1, y1 = [int(v * 1.5) for v in d["bbox"]]
-                    if d["remove"]:
-                        red[y0:y1, x0:x1] = 255
-                        red_boxes.append((x0, y0, x1, y1))
-                    else:
-                        blue[y0:y1, x0:x1] = 255
+                red, blue, red_boxes, skipped_invalid_bboxes = build_vector_debug_masks(
+                    decision_page,
+                    before.shape,
+                    scale=1.5,
+                )
+                if debug_data:
+                    debug_data[0]["skipped_invalid_bboxes"] = skipped_invalid_bboxes
             else:
                 prog.progress(15, text="Running raster cleaner…")
                 cleaned, overlay_rb = clean_raster_image(before, sensitivity)
