@@ -19,6 +19,7 @@ from cleaner.raster_cleaner import clean_raster_image
 from cleaner.svg_export import export_debug_svg
 from cleaner.vector_cleaner import clean_vector_pdf_bytes
 from cleaner.zone_detector import auto_detect_zones, assign_tiers, canvas_json_to_mask, flood_fill_zone, merge_zone_masks
+from cleaner.track3_cad_bridge import parse_cad_geometry_payload, curves_to_segments
 
 
 @st.cache_data(show_spinner=False)
@@ -93,7 +94,30 @@ def _composite_cached(base: np.ndarray, pkg, visible: dict) -> np.ndarray:
     st.session_state["_composite_result"] = result
     return result
 
+
+
+def init_api_endpoints():
+    """Accept local CAD payloads sent with ?api_action=process_geometry."""
+    query_params = st.query_params
+    if query_params.get("api_action") != "process_geometry":
+        return
+
+    raw_cad_payload = st.text_area("Internal CAD Stream", key="cad_stream_buffer")
+    if raw_cad_payload:
+        try:
+            payload = parse_cad_geometry_payload(raw_cad_payload)
+            segments = curves_to_segments(payload)
+        except Exception as exc:
+            st.error(f"CAD payload parse error: {exc}")
+            st.stop()
+
+        st.success("CAD Data Synced Successfully.")
+        st.json({"curve_count": len(segments), "payload": payload})
+        st.stop()
+
 st.set_page_config(page_title="PW-PLAN-CLEANER-01", layout="wide")
+
+init_api_endpoints()
 
 st.markdown(
     """
