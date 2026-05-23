@@ -14,6 +14,12 @@ from cleaner.halftone_duotone import duotone_flat, halftone_duotone
 from cleaner.layer_reader import read_pdf_layers, render_with_visibility
 from cleaner.mask_package import build_mask_package, composite_masks_preview
 from cleaner.masking import colorize_overlay, mask_to_transparent_png
+from cleaner.mcp_bridge import (
+    parse_query_bridge_payload,
+    payload_to_guidance_masks,
+    serialize_for_export,
+    validate_bridge_payload,
+)
 from cleaner.preview import render_pdf_page
 from cleaner.raster_cleaner import clean_raster_image
 from cleaner.svg_export import export_debug_svg
@@ -343,6 +349,8 @@ if "zone_mask" not in st.session_state:
     st.session_state.zone_mask = None   # accumulated manual + auto zone mask
 if "proposal" not in st.session_state:
     st.session_state.proposal = None    # ProposalResult | None
+if "cad_bridge" not in st.session_state:
+    st.session_state.cad_bridge = None  # validated payload + masks
 
 left, center, right = st.columns([1.15, 3.6, 1.25])
 
@@ -613,6 +621,23 @@ if uploaded:
             prog.progress(65, text="Building canonical mask package…")
             pkg = build_mask_package(before, hatch_mask=red)
 
+            # Optional CAD bridge (feature-flagged via query param)
+            cad_bridge_artifact = None
+            cad_flag = str(st.query_params.get("cad_bridge", "0")).lower() in {"1", "true", "yes", "on"}
+            if cad_flag:
+                raw_payload = parse_query_bridge_payload(st.query_params)
+                if raw_payload is not None:
+                    try:
+                        bridge_payload = validate_bridge_payload(raw_payload)
+                        bridge_masks = payload_to_guidance_masks(bridge_payload, before.shape[:2])
+                        # Merge hints conservatively with existing internal masks.
+                        pkg.landscape_editable = cv2.bitwise_or(pkg.landscape_editable, bridge_masks["landscape_hint"])
+                        pkg.architecture_locked = cv2.bitwise_or(pkg.architecture_locked, bridge_masks["architecture_hint"])
+                        cad_bridge_artifact = serialize_for_export(bridge_payload, bridge_masks)
+                    except Exception:
+                        # Invalid payload should not fail the pipeline.
+                        cad_bridge_artifact = None
+
             # ── zone detection ──────────────────────────────────────────────
             if zone_mode == "Auto-detect" or st.session_state.zone_mask is None:
                 auto_zone, _ = auto_detect_zones(before, pkg.architecture_locked)
@@ -683,6 +708,7 @@ if uploaded:
                 "out_lmask": ok_lmask,
                 "out_debug": ok_debug,
                 "debug": debug_data,
+                "cad_bridge": cad_bridge_artifact,
                 "mode": "vector" if do_vector else "raster",
                 "affected_count": int(np.count_nonzero(red > 0)),
             }
@@ -791,7 +817,7 @@ if st.session_state.state.get("before") is not None:
                 masks=pkg.as_dict() if pkg else {},
                 svg_elements=prop.svg_paths if prop else [],
                 primitives=prop.primitives if prop else [],
-                debug_data={"cleaner": data.get("debug", [])},
+                debug_data={"cleaner": data.get("debug", []), "cad_bridge": data.get("cad_bridge")},
             )
             st.success(f"Bundle saved: {len(bundle)} files")
             if "grasshopper_json" in bundle:
