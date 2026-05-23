@@ -7,17 +7,16 @@ import fitz
 import numpy as np
 import streamlit as st
 
-from cleaner.ai_proposal import BACKENDS, ProposalResult
+from cleaner.ai_proposal import ProposalResult
 from cleaner.export import save_outputs, save_landscape_bundle
 from cleaner.geometry_parser import parse_pdf_geometry
+from cleaner.pipeline import PipelineContext, run_pipeline
 from cleaner.halftone_duotone import duotone_flat, halftone_duotone
 from cleaner.layer_reader import read_pdf_layers, render_with_visibility
-from cleaner.mask_package import build_mask_package, composite_masks_preview
-from cleaner.masking import colorize_overlay, mask_to_transparent_png
+from cleaner.mask_package import composite_masks_preview
+from cleaner.masking import colorize_overlay
 from cleaner.preview import render_pdf_page
-from cleaner.raster_cleaner import clean_raster_image
 from cleaner.svg_export import export_debug_svg
-from cleaner.vector_cleaner import clean_vector_pdf_bytes
 from cleaner.zone_detector import auto_detect_zones, assign_tiers, canvas_json_to_mask, flood_fill_zone, merge_zone_masks
 
 
@@ -508,20 +507,6 @@ if uploaded:
     first_drawings = _cached_drawings_count(pdf_bytes)
     do_vector = (mode == "Vector") or (mode == "Auto" and first_drawings > 20)
 
-    # ── Handle AI proposal (run outside column context) ─────────────────────
-    if run_ai and st.session_state.state.get("pkg"):
-        pkg = st.session_state.state["pkg"]
-        from cleaner.ai_proposal import ClaudeVisionBackend, ProceduralBackend
-        if ai_backend_name == "Claude Vision":
-            backend = ClaudeVisionBackend(api_key=_api_key)
-        else:
-            backend = BACKENDS[ai_backend_name]
-        with st.spinner(f"Generating landscape via {backend.name}…"):
-            result = backend.propose(before, pkg, ai_prompt, ai_style, ai_tier)
-        st.session_state.proposal = result
-        if result.error:
-            st.warning(f"AI backend: {result.error}")
-
     with center:
         st.markdown("<div class='sec-label'>PLAN WORKSPACE</div>", unsafe_allow_html=True)
 
@@ -577,69 +562,32 @@ if uploaded:
 
         if st.button("▶  RUN PREPROCESSING"):
             prog = st.progress(0, text="Initialising…")
-            if do_vector:
-                prog.progress(15, text="Detecting hatch vectors…")
-                cleaned_pdf, debug_data, decisions_by_page = clean_vector_pdf_bytes(pdf_bytes, sensitivity)
-                prog.progress(50, text="Rasterising cleaned PDF…")
-                cleaned = render_pdf_page(cleaned_pdf, 0, 1.5)
-                decision_page = decisions_by_page[0] if decisions_by_page else []
-                red = np.zeros(before.shape[:2], dtype=np.uint8)
-                blue = np.zeros(before.shape[:2], dtype=np.uint8)
-                red_boxes = []
-                for d in decision_page:
-                    x0, y0, x1, y1 = [int(v * 1.5) for v in d["bbox"]]
-                    if d["remove"]:
-                        red[y0:y1, x0:x1] = 255
-                        red_boxes.append((x0, y0, x1, y1))
-                    else:
-                        blue[y0:y1, x0:x1] = 255
-            else:
-                prog.progress(15, text="Running raster cleaner…")
-                cleaned, overlay_rb = clean_raster_image(before, sensitivity)
-                prog.progress(50, text="Encoding cleaned image…")
-                cleaned_pdf_doc = fitz.open()
-                p = cleaned_pdf_doc.new_page(width=before.shape[1], height=before.shape[0])
-                ok, buf = cv2.imencode('.png', cleaned)
-                if not ok:
-                    st.error("WARNING: PNG encoding failed")
-                    st.stop()
-                p.insert_image(p.rect, stream=buf.tobytes())
-                cleaned_pdf = cleaned_pdf_doc.tobytes()
-                debug_data = [{"page": 0, "mode": "raster", "note": "fallback"}]
-                red = cv2.inRange(overlay_rb, (0, 0, 200), (20, 20, 255))
-                blue = cv2.inRange(overlay_rb, (200, 0, 0), (255, 30, 30))
-                red_boxes = []
+            pctx = PipelineContext(
+                pdf_bytes=pdf_bytes,
+                before_bgr=before,
+                sensitivity=sensitivity,
+                do_vector=do_vector,
+                zone_mode=zone_mode,
+                manual_zone_mask=st.session_state.zone_mask,
+                ai_backend_name=ai_backend_name,
+                ai_api_key=_api_key,
+                ai_prompt=ai_prompt,
+                ai_style=ai_style,
+                ai_tier=ai_tier,
+            )
+            prog.progress(20, text="Running pipeline stages…")
+            out_ctx = run_pipeline(pctx, options={"run_ai": run_ai})
+            prog.progress(70, text="Exporting outputs…")
 
-            prog.progress(65, text="Building canonical mask package…")
-            pkg = build_mask_package(before, hatch_mask=red)
-
-            # ── zone detection ──────────────────────────────────────────────
-            if zone_mode == "Auto-detect" or st.session_state.zone_mask is None:
-                auto_zone, _ = auto_detect_zones(before, pkg.architecture_locked)
-                manual_zone = st.session_state.zone_mask
-                if manual_zone is not None and manual_zone.shape == auto_zone.shape:
-                    zone_final = merge_zone_masks(auto_zone, manual_zone)
-                else:
-                    zone_final = auto_zone
-            else:
-                zone_final = st.session_state.zone_mask
-
-            # Merge detected zone into pkg
-            import numpy as _np  # already imported as np
-            merged_land = cv2.bitwise_or(pkg.landscape_editable, zone_final)
-            merged_land = cv2.bitwise_and(merged_land, cv2.bitwise_not(pkg.architecture_locked))
-            pkg.landscape_editable[:] = merged_land
-
-            # Assign tiers
-            fg, mg, bg = assign_tiers(pkg.landscape_editable, pkg.architecture_locked)
-            pkg.tier_foreground = fg
-            pkg.tier_midground  = mg
-            pkg.tier_background = bg
-
+            cleaned_pdf = out_ctx.cleaned_pdf
+            cleaned = out_ctx.cleaned_bgr
+            debug_data = out_ctx.debug_data or []
+            red = out_ctx.red_mask
+            red_boxes = out_ctx.red_boxes
+            pkg = out_ctx.pkg
             overlay = _composite_cached(before, pkg, st.session_state.mask_vis)
-            transparent = mask_to_transparent_png(cleaned, cv2.bitwise_not(red))
+            transparent = out_ctx.transparent_png
 
-            prog.progress(80, text="Exporting outputs…")
             svg_path = export_debug_svg(before.shape[1], before.shape[0], red_boxes, Path("pw-plan-cleaner-01/outputs") / f"{Path(uploaded.name).stem}_debug.svg")
 
             outputs = save_outputs(
@@ -647,7 +595,7 @@ if uploaded:
                 Path(uploaded.name).stem,
                 cleaned_pdf,
                 cleaned,
-                {"vector_geometry": gmeta, "cleaner": debug_data},
+                {"vector_geometry": out_ctx.geometry_meta or gmeta, "cleaner": debug_data, "pipeline": out_ctx.stage_results},
                 transparent_png=transparent,
                 svg_path=svg_path,
                 landscape_mask=pkg.landscape_editable,
@@ -660,6 +608,7 @@ if uploaded:
                 ht_result = halftone_duotone(before, hatch_mask=red, cell=ht_cell, color_dark=ink_dark, color_light=ink_light)
 
             prog.progress(100, text="Done.")
+            st.session_state.proposal = out_ctx.ai_result
 
             ok_pdf  = Path(outputs["pdf"]).read_bytes()
             ok_tpng = Path(outputs["transparent_png"]).read_bytes()
@@ -686,7 +635,6 @@ if uploaded:
                 "mode": "vector" if do_vector else "raster",
                 "affected_count": int(np.count_nonzero(red > 0)),
             }
-            st.session_state.proposal = None
 
 if st.session_state.state.get("before") is not None:
     data = st.session_state.state
@@ -801,7 +749,6 @@ if st.session_state.state.get("before") is not None:
 
         if st.button("↺  UNDO / RESET"):
             st.session_state.state = {"ocg_layers": data.get("ocg_layers")}
-            st.session_state.proposal = None
             st.session_state.zone_mask = None
             st.rerun()
 
