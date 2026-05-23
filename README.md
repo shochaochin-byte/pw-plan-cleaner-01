@@ -69,3 +69,46 @@ streamlit run app.py
 - Always writes new outputs.
 - Default mode is conservative.
 - Avoids removal near text/title-zone and likely structural linework.
+
+## Optional CAD Bridge (URL payload)
+The app now supports an optional CAD bridge module (`cleaner/mcp_bridge.py`) that can ingest structured geometry from URL query params and merge it into internal guidance masks.
+
+### Feature flag
+- Enable with query param: `cad_bridge=1`
+- Provide payload in `cad_payload` as either:
+  - raw JSON string, or
+  - URL-safe base64 encoded JSON
+
+If the bridge flag is off, payload is missing, or payload is invalid, preprocessing continues normally without failure.
+
+### Expected payload schema
+```json
+{
+  "units": "mm",
+  "layers": [
+    { "id": "L1", "name": "LANDSCAPE_ZONE" },
+    { "id": "A1", "name": "ARCH_LOCK" }
+  ],
+  "polylines": [
+    {
+      "layer": "L1",
+      "closed": true,
+      "points": [[120.0, 300.0], [640.0, 320.0], [620.0, 760.0], [130.0, 740.0]]
+    }
+  ],
+  "curves": [
+    {
+      "layer": "A1",
+      "control_points": [[300.0, 200.0], [350.0, 260.0], [400.0, 240.0], [450.0, 300.0]]
+    }
+  ]
+}
+```
+
+### Example URL
+```text
+http://localhost:8501/?cad_bridge=1&cad_payload=%7B%22units%22%3A%22mm%22%2C%22layers%22%3A%5B%7B%22id%22%3A%22L1%22%2C%22name%22%3A%22LANDSCAPE_ZONE%22%7D%5D%2C%22polylines%22%3A%5B%7B%22layer%22%3A%22L1%22%2C%22closed%22%3Atrue%2C%22points%22%3A%5B%5B100%2C100%5D%2C%5B600%2C100%5D%2C%5B600%2C500%5D%2C%5B100%2C500%5D%5D%7D%5D%2C%22curves%22%3A%5B%5D%7D
+```
+
+### Export artifact
+When a valid bridge payload is applied and full bundle export runs, `outputs/<stem>_export/cad_bridge.json` is emitted for Rhino/Grasshopper downstream consumption.
