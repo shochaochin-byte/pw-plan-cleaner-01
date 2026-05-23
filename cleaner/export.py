@@ -143,6 +143,12 @@ def save_landscape_bundle(
     meta_path.write_text(json.dumps(debug_data, indent=2), encoding="utf-8")
     out["metadata"] = meta_path
 
+    cad_bridge = debug_data.get("cad_bridge") if isinstance(debug_data, dict) else None
+    if cad_bridge:
+        cad_path = export_dir / "cad_bridge.json"
+        cad_path.write_text(json.dumps(cad_bridge, indent=2), encoding="utf-8")
+        out["cad_bridge_json"] = cad_path
+
     return out
 
 
